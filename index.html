@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Pollewood</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏡</text></svg>">
+<style>
+  :root {
+    --bg: #f6f3ee;
+    --card: #ffffff;
+    --text: #2b2a28;
+    --muted: #6d6a64;
+    --accent: #3f6b5c;
+    --accent-soft: #e3ece8;
+    --line: #e4dfd6;
+    --radius: 14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1b1c1b;
+      --card: #252725;
+      --text: #ecebe7;
+      --muted: #a9a69f;
+      --accent: #8cc1ad;
+      --accent-soft: #2f3b36;
+      --line: #383a37;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 17px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 0 16px; }
+
+  /* Language bar */
+  .langbar {
+    position: sticky; top: 0; z-index: 10;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
+  }
+  .langbar .wrap { display: flex; justify-content: center; gap: 6px; padding-top: 10px; padding-bottom: 10px; }
+  .langbar button {
+    flex: 1; max-width: 120px;
+    border: 1px solid var(--line); background: var(--card); color: var(--text);
+    border-radius: 999px; padding: 8px 6px; font: inherit; font-size: 15px; cursor: pointer;
+  }
+  .langbar button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 600; }
+
+  /* Header */
+  header { padding: 36px 0 12px; text-align: center; }
+  header h1 { margin: 0; font-size: 40px; letter-spacing: -0.5px; font-weight: 700; }
+  header p { margin: 6px 0 0; color: var(--muted); }
+  .hero { margin-top: 22px; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border-radius: var(--radius); display: block; background: var(--line); }
+
+  /* Table of contents */
+  nav.toc { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 22px 0 8px; }
+  nav.toc a {
+    text-decoration: none; color: var(--accent); background: var(--accent-soft);
+    padding: 6px 12px; border-radius: 999px; font-size: 15px;
+  }
+
+  /* Sections */
+  section {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    margin: 18px 0; padding: 22px 20px; scroll-margin-top: 70px;
+  }
+  section h2 { margin: 0 0 10px; font-size: 24px; }
+  section p { margin: 0 0 12px; }
+  section ul { margin: 0 0 12px; padding-left: 22px; }
+  section li { margin-bottom: 6px; }
+  section a { color: var(--accent); }
+  section > *:last-child { margin-bottom: 0; }
+  .photos { display: grid; gap: 10px; margin: 0 0 14px; }
+  .photos.n2, .photos.n4 { grid-template-columns: 1fr 1fr; }
+  .photos.n3 { grid-template-columns: 1fr 1fr; }
+  .photos.n3 img:first-child { grid-column: span 2; }
+  .photos img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; display: block; background: var(--line); }
+  .photos.n1 img { aspect-ratio: 16 / 10; }
+
+  footer { text-align: center; color: var(--muted); font-size: 14px; padding: 18px 0 40px; }
+</style>
+</head>
+<body>
+  <div class="langbar"><div class="wrap" id="langs"></div></div>
+
+  <div class="wrap">
+    <header>
+      <h1 id="title"></h1>
+      <p id="subtitle"></p>
+      <img class="hero" id="hero" alt="">
+    </header>
+    <nav class="toc" id="toc"></nav>
+    <main id="sections"></main>
+    <footer id="footer"></footer>
+  </div>
+
+<script src="content.js"></script>
+<script>
+(function () {
+  var langs = Object.keys(SITE.languages);
+
+  // Pick the language: ?lang= in the link, then the guest's last choice, then the phone's language.
+  function pickLanguage() {
+    var fromUrl = new URLSearchParams(location.search).get("lang");
+    if (fromUrl && langs.indexOf(fromUrl) !== -1) return fromUrl;
+    try {
+      var saved = localStorage.getItem("pollewood-lang");
+      if (saved && langs.indexOf(saved) !== -1) return saved;
+    } catch (e) {}
+    var browser = (navigator.languages || [navigator.language || ""]);
+    for (var i = 0; i < browser.length; i++) {
+      var code = String(browser[i]).slice(0, 2).toLowerCase();
+      if (code === "nb" || code === "nn" || code === "no" || code === "sv") code = "da";
+      if (langs.indexOf(code) !== -1) return code;
+    }
+    return SITE.defaultLanguage;
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
+
+  // Simple text formatting: blank line = new paragraph, "- " = bullet,
+  // **bold**, and [link text](https://...).
+  function inline(s) {
+    return esc(s)
+      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+|tel:[^)\s]+|mailto:[^)\s]+)\)/g,
+        '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  }
+  function format(text) {
+    var blocks = String(text || "").trim().split(/\n\s*\n/);
+    return blocks.map(function (block) {
+      var lines = block.split("\n").map(function (l) { return l.trim(); }).filter(Boolean);
+      var html = "", para = [], items = [];
+      function flush() {
+        if (para.length) { html += "<p>" + para.map(inline).join("<br>") + "</p>"; para = []; }
+        if (items.length) { html += "<ul>" + items.map(function (l) { return "<li>" + inline(l) + "</li>"; }).join("") + "</ul>"; items = []; }
+      }
+      lines.forEach(function (l) {
+        if (l.indexOf("- ") === 0) { if (para.length) flush(); items.push(l.slice(2)); }
+        else { if (items.length) flush(); para.push(l); }
+      });
+      flush();
+      return html;
+    }).join("");
+  }
+
+  function t(value, lang) {
+    if (value == null) return "";
+    if (typeof value === "string") return value;
+    return value[lang] || value[SITE.defaultLanguage] || "";
+  }
+
+  function render(lang) {
+    document.documentElement.lang = lang;
+    document.title = SITE.name;
+    document.getElementById("title").textContent = SITE.name;
+    document.getElementById("subtitle").textContent = t(SITE.tagline, lang);
+
+    var hero = document.getElementById("hero");
+    if (SITE.heroImage) { hero.src = SITE.heroImage; hero.alt = SITE.name; hero.style.display = ""; }
+    else hero.style.display = "none";
+
+    document.getElementById("langs").innerHTML = langs.map(function (code) {
+      return '<button type="button" data-lang="' + code + '" aria-pressed="' + (code === lang) + '">' +
+        esc(SITE.languages[code]) + "</button>";
+    }).join("");
+
+    document.getElementById("toc").innerHTML = SITE.sections.map(function (s) {
+      return '<a href="#' + esc(s.id) + '">' + esc(t(s.title, lang)) + "</a>";
+    }).join("");
+
+    document.getElementById("sections").innerHTML = SITE.sections.map(function (s) {
+      var imgs = s.images || [];
+      var photos = imgs.length
+        ? '<div class="photos n' + Math.min(imgs.length, 4) + '">' + imgs.map(function (src) {
+            return '<img loading="lazy" src="' + esc(src) + '" alt="' + esc(t(s.title, lang)) + '">';
+          }).join("") + "</div>"
+        : "";
+      return '<section id="' + esc(s.id) + '"><h2>' + esc(t(s.title, lang)) + "</h2>" +
+        photos + format(t(s.text, lang)) + "</section>";
+    }).join("");
+
+    document.getElementById("footer").innerHTML = format(t(SITE.footer, lang));
+  }
+
+  var current = pickLanguage();
+  render(current);
+
+  document.getElementById("langs").addEventListener("click", function (e) {
+    var btn = e.target.closest("button[data-lang]");
+    if (!btn) return;
+    current = btn.getAttribute("data-lang");
+    try { localStorage.setItem("pollewood-lang", current); } catch (err) {}
+    render(current);
+  });
+})();
+</script>
+</body>
+</html>
